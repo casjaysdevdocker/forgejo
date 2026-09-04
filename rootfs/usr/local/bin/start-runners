@@ -1,0 +1,174 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+# - - - - - - - - - - - - - - - - - - - - - - - - -
+##@Version           :  202609030524-git
+# @@Author           :  Jason Hempstead
+# @@Contact          :  jason@casjaysdev.pro
+# @@License          :  LICENSE.md
+# @@ReadME           :  start-runners --help
+# @@Copyright        :  Copyright: (c) 2026 Jason Hempstead, Casjays Developments
+# @@Created          :  Friday, Jun 05, 2026 18:14 EDT
+# @@File             :  start-runners
+# @@Description      :  Start act runners
+# @@Changelog        :  New script
+# @@TODO             :  Better documentation
+# @@Other            :
+# @@Resource         :
+# @@Terminal App     :  no
+# @@sudo/root        :  no
+# @@Template         :  shell/bash
+# - - - - - - - - - - - - - - - - - - - - - - - - -
+# shellcheck disable=SC1001,SC1003,SC2001,SC2003,SC2016,SC2031,SC2090,SC2115,SC2120,SC2155,SC2199,SC2229,SC2317,SC2329
+# - - - - - - - - - - - - - - - - - - - - - - - - -
+VERSION="202609030524-git"
+set -e
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+trap 'retVal=$?; emoji=$( [ -z "$NO_COLOR" ] && echo "❌ " || echo "" ); \
+echo "${emoji}Fatal error occurred: Exit code $retVal at line $LINENO in command: $BASH_COMMAND"; \
+kill -TERM 1' ERR
+trap 'retVal=$?;if [ "$SERVICE_IS_RUNNING" != "yes" ] && [ -f "$SERVICE_PID_FILE" ]; then rm -Rf "$SERVICE_PID_FILE"; fi;exit $retVal' SIGINT SIGTERM SIGPWR
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+# Function to __log messages with timestamp
+__log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" >>"$RUNNERS_LOG_DIR/runners" 2>&1; }
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+# Function to cleanup child processes on exit
+__cleanup() {
+	__log "Shutting down runners..."
+	kill $(jobs -p) 2>/dev/null || true
+	wait
+	__log "All runners stopped"
+}
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+# Set up signal handling
+trap __cleanup SIGTERM SIGINT
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+# Validate required environment variables
+if [ -n "$SERVER_ADDRESS" ]; then
+	if [[ "$SERVER_ADDRESS" != *"://"* ]]; then
+		SERVER_ADDRESS="http://$SERVER_ADDRESS"
+	fi
+else
+	SERVER_ADDRESS=http://$HOSTNAME
+fi
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+if [ -z "$SERVER_TOKEN" ]; then
+	__log "ERROR: SERVER_TOKEN environment variable is required"
+	exit 1
+fi
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+if [ -z "$RUNNER_LABELS" ]; then
+	_default_runner_labels=(
+		"linux:host"
+		"node14:docker://node:14"
+		"node16:docker://node:16"
+		"node18:docker://node:18"
+		"node20:docker://node:20"
+		"node22:docker://node:22"
+		"node:docker://node:latest"
+		"perl:docker://perl:latest"
+		"ruby:docker://ruby:latest"
+		"python:docker://python:latest"
+		"python3:docker://python:latest"
+		"php7:docker://casjaysdevdocker/php:7"
+		"php8:docker://casjaysdevdocker/php:8"
+		"php:docker://casjaysdevdocker/php:latest"
+		"alpine:docker://casjaysdev/alpine:latest"
+		"debian:docker://casjaysdev/debian:latest"
+		"ubuntu:docker://casjaysdev/ubuntu:latest"
+		"rhel:docker://casjaysdev/almalinux:latest"
+		"redhat:docker://casjaysdev/almalinux:latest"
+		"almalinux:docker://casjaysdev/almalinux:latest"
+		"act_runner:docker://catthehacker/ubuntu:full-latest"
+		"ubuntu-latest:docker://catthehacker/ubuntu:full-latest"
+	)
+	RUNNER_LABELS="$(
+		IFS=,
+		echo "${_default_runner_labels[*]}"
+	)"
+	unset _default_runner_labels
+fi
+# Determine number of runners to start
+RUNNERS_START=${RUNNERS_START:-1}
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+# Validate RUNNERS_START is a positive integer
+if ! [[ "$RUNNERS_START" =~ ^[0-9]+$ ]] || [ "$RUNNERS_START" -lt 1 ]; then
+	__log "WARNING: Invalid RUNNERS_START value '$RUNNERS_START', defaulting to 1"
+	RUNNERS_START=1
+fi
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+__log "Starting $RUNNERS_START act_runner instance(s)"
+__log "Server Address: $SERVER_ADDRESS"
+__log "Runner Name Prefix: ${RUNNER_NAME_PREFIX:-runner}"
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+# Shared cache config so runner-N instances use the same cache-server
+# started by zz-act_runner.sh instead of an unshared per-process cache.
+RUNNERS_CACHE_CONFIG=""
+if [ -n "$RUNNER_CACHE_HOST" ] && [ -n "$RUNNER_CACHE_PORT" ] && [ -n "$RUNNER_CACHE_SECRET" ]; then
+	RUNNERS_CACHE_CONFIG="/config/act_runner/runners-cache.yaml"
+	cat <<EOF >"$RUNNERS_CACHE_CONFIG"
+cache:
+  enabled: true
+  external_server: 'http://${RUNNER_CACHE_HOST}:${RUNNER_CACHE_PORT}/'
+  external_secret: '${RUNNER_CACHE_SECRET}'
+EOF
+fi
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+# Register a single runner synchronously (no daemon start)
+__register_runner() {
+	local runner_id=$1
+	local runner_name="${RUNNER_NAME_PREFIX:-runner}-${runner_id}"
+	local runner_dir="/config/act_runner/reg/${runner_name}"
+	local config_args=()
+
+	mkdir -p "$runner_dir"
+	[ -d "$runner_dir" ] && cd "$runner_dir" || return 1
+	[ -n "$RUNNERS_CACHE_CONFIG" ] && config_args=(--config "$RUNNERS_CACHE_CONFIG")
+
+	if [ ! -f "$runner_dir/.runner" ]; then
+		__log "Registering runner: $runner_name (ID: $runner_id)"
+		act_runner register "${config_args[@]}" --instance "$SERVER_ADDRESS" --token "$SERVER_TOKEN" --name "$runner_name" --labels "$RUNNER_LABELS" --no-interactive
+		if [ $? -ne 0 ]; then
+			__log "ERROR: Failed to register runner $runner_name"
+			return 1
+		fi
+	fi
+	__log "Runner $runner_name registered"
+}
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+# Start daemon for a single runner (called in background after all are registered)
+__start_runner_daemon() {
+	local runner_id=$1
+	local runner_name="${RUNNER_NAME_PREFIX:-runner}-${runner_id}"
+	local runner_dir="/config/act_runner/reg/${runner_name}"
+	local config_args=()
+
+	[ -d "$runner_dir" ] && cd "$runner_dir" || return 1
+	[ -n "$RUNNERS_CACHE_CONFIG" ] && config_args=(--config "$RUNNERS_CACHE_CONFIG")
+	__log "Starting daemon for runner: $runner_name"
+	exec act_runner daemon "${config_args[@]}"
+}
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+# Phase 1: register all runners sequentially so IDs are assigned in order
+for i in $(seq 1 $RUNNERS_START); do
+	__register_runner "$i" || { __log "Aborting: registration failed for runner-$i"; exit 1; }
+done
+unset i
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+# Phase 2: start all daemons in parallel
+for i in $(seq 1 $RUNNERS_START); do
+	(__start_runner_daemon "$i") &
+done
+unset i
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+RUNNERS_ID="$(jobs -p | tr '\n' ' ')"
+if [ -n "$RUNNERS_ID" ]; then
+	__log "All $RUNNERS_START runners started successfully"
+	__log "Process IDs: $RUNNERS_ID"
+	printf 'All %s runners started successfully: %s\n' "$RUNNERS_START" "$RUNNERS_ID"
+else
+	__log "The runners have failed to start"
+	printf '%s\n' "The runners have failed to start"
+fi
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+# Wait for all background processes
+wait

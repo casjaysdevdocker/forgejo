@@ -1,0 +1,35 @@
+Port 7833
+Protocol 2
+
+AddressFamily any
+ListenAddress 0.0.0.0
+ListenAddress ::
+
+LogLevel INFO
+
+HostKey REPLACE_SSH_CONF_DIR/ssh_host_ed25519_key
+HostKey REPLACE_SSH_CONF_DIR/ssh_host_rsa_key
+HostKey REPLACE_SSH_CONF_DIR/ssh_host_ecdsa_key
+
+AuthorizedKeysFile REPLACE_SSH_DATA_DIR/authorized_keys
+AuthorizedPrincipalsFile REPLACE_SSH_DATA_DIR/authorized_principals
+TrustedUserCAKeys REPLACE_SSH_DATA_DIR/forgejo-trusted-user-ca-keys.pem
+CASignatureAlgorithms ecdsa-sha2-nistp256,ecdsa-sha2-nistp384,ecdsa-sha2-nistp521,sk-ecdsa-sha2-nistp256@openssh.com,ssh-ed25519,sk-ssh-ed25519@openssh.com,rsa-sha2-512,rsa-sha2-256,ssh-rsa
+
+UseDNS no
+AllowAgentForwarding no
+AllowTcpForwarding no
+PrintMotd no
+
+PermitUserEnvironment yes
+PermitRootLogin no
+ChallengeResponseAuthentication no
+PasswordAuthentication no
+PermitEmptyPasswords no
+
+AllowUsers git
+
+Banner none
+Subsystem sftp /usr/lib/ssh/sftp-server
+
+AcceptEnv GIT_PROTOCOL

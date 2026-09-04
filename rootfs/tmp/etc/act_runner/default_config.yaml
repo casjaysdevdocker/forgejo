@@ -1,0 +1,71 @@
+# Config for act_runner daemon
+log:
+  # The level of logging, can be trace, debug, info, warn, error, fatal
+  level: warn
+
+host:
+  # The parent directory of a job's working directory.
+  workdir_parent: 'REPLACE_RUNNER_TEMP'
+
+runner:
+  # Where to store the registration result.
+  file: REPLACE_RUNNER_HOME/runners
+  # Execute how many tasks concurrently at the same time.
+  capacity: 4
+  # Extra environment variables to run jobs.
+  envs:
+    A_TEST_ENV_NAME_1: a_test_env_value_1
+  # Extra environment variables to run jobs from a file.
+  env_file: .env
+  # The timeout for a job to be finished.
+  timeout: 3h
+  # Whether skip verifying the TLS certificate of the Forgejo instance.
+  insecure: true
+  # The timeout for fetching the job from the Forgejo instance.
+  fetch_timeout: 5s
+  # The interval for fetching the job from the Forgejo instance.
+  fetch_interval: 2s
+  # The labels of a runner are used to determine which jobs the runner can run, and how to run them.
+  labels:
+    #- 'macos:docker:dockurr/macos'
+    #- 'windows:docker:dockurr/windows'
+    #- 'linux:docker:casjaysdev/almalinux'
+    #- 'alma:docker:casjaysdev/almalinux'
+    #- 'alpine:docker:casjaysdev/alpine'
+    #- 'debian:docker:casjaysdev/debian'
+    #- 'arch:docker:casjaysdev/archlinux'
+    #- 'node:docker://node:latest'
+    #- 'node14:docker://node:14'
+    #- 'node16:docker://node:16'
+    #- 'node18:docker://node:18'
+    #- 'node20:docker://node:20'
+    #- 'node20:docker://node:20'
+    #- 'python3:docker://python:latest'
+    #- 'php7:docker://php:7-fpm'
+    #- 'php8:docker://php:8-fpm'
+    #- 'php:docker://php:8.4-rc-fpm-alpine3.20'
+    #- 'alpine:docker://casjaysdev/alpine:latest'
+    #- 'almalinux:docker://casjaysdev/almalinux:latest'
+    #- 'debian:docker://casjaysdev/debian:latest'
+    #- 'ubuntu:docker://casjaysdev/ubuntu:latest'
+    #- 'linux:host,ubuntu-latest:docker://catthehacker/ubuntu:full-latest'
+
+container:
+  # Specifies the network to which the container will connect.
+  network: 'bridge'
+  # Whether to use privileged mode or not when launching task containers (privileged mode is required for Docker-in-Docker).
+  privileged: true
+  # And other options to be used when the container is started (eg, --add-host=my.forgejo.url:host-gateway).
+  options:
+  # The parent directory of a job's working directory.
+  workdir_parent: 'REPLACE_RUNNER_TEMP/volumes'
+  # Volumes (including bind mounts) can be mounted to containers. Glob syntax is supported, see https://github.com/gobwas/glob
+  valid_volumes:
+    - '**'
+  # overrides the docker client host with the specified one.
+  docker_host: ''
+
+cache:
+  enabled: true
+  external_server: 'http://REPLACE_RUNNER_CACHE_HOST:REPLACE_RUNNER_CACHE_PORT/'
+  external_secret: 'REPLACE_RUNNER_CACHE_SECRET'
