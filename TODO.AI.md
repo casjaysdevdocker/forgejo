@@ -1,26 +1,46 @@
 # TODO.AI.md
 
-## Found, not fixed — healthcheck reports "healthy" before HTTP port reliably reachable after `docker restart`
+## Partially fixed — healthcheck reports "healthy" before HTTP port reliably reachable after `docker restart`
 
 Found via a structured beta-test pass (`beta-tester` agent) against `forgejo-test:local`
 built and run locally after today's Dockerfile/act_runner fixes, to verify prod-readiness.
 
 - Repro: `docker restart` the container, poll `docker inspect --format
   '{{.State.Health.Status}}'` until `healthy`, then immediately issue an external HTTP
-  request (e.g. `curl http://localhost:18080/api/v1/version`) — the very first request
+  request (e.g. `curl http://localhost:18080/api/v1/version`) — the very first request(s)
   right after the healthy transition returned `Recv failure: Connection reset by peer`,
   even though the internal `forgejo web` process was already running per `ps aux`. A retry
   seconds later succeeded normally.
-- Likely cause: a short window where the internal process is up (satisfying whatever the
-  healthcheck probes internally) but the Docker userland-proxy/port-publish path for
-  `-p 18080:80` hasn't stabilized yet, or the health check races the actual listener bind.
+- Root cause, part 1 (fixed): by default `HEALTH_ENDPOINTS` is empty, so
+  `entrypoint.sh healthcheck` only checked process presence (`__pgrep`) and that the port
+  showed up in the container's own `netstat` output — neither confirms Forgejo is actually
+  answering HTTP. Fixed by adding a new hand-crafted env fragment,
+  `rootfs/usr/local/etc/docker/env/10-healthcheck.sh`, which sets
+  `HEALTH_ENDPOINTS="http://127.0.0.1:${FORGEJO_PORT:-80}/api/healthz"`. This is sourced by
+  `entrypoint.sh` on every invocation including the `HEALTHCHECK` probe itself (per AI.md
+  PART 5's entrypoint flow), so no `[generated]` file was touched. Verified: rebuilt the
+  image, confirmed `HEALTH_ENDPOINTS` resolves correctly inside the running container, and
+  confirmed `entrypoint.sh healthcheck` now performs a real `curl -f` HTTP check
+  (`__curl`) against Forgejo and reports it in the healthcheck log.
+- Root cause, part 2 (not fixed, out of scope here): re-running the exact restart repro
+  after the fix still reproduces the connection reset — and a direct `docker exec` into the
+  container during the reset window showed the *internal* `curl 127.0.0.1/api/healthz` also
+  failing to connect, while `docker inspect` still reported `healthy`. This is because the
+  Dockerfile's `HEALTHCHECK --start-period=10m --interval=5m ...` directive only re-runs the
+  probe every 5 minutes; once one check passes, Docker keeps showing `healthy` for up to 5
+  minutes even if Forgejo has a brief internal hiccup (e.g. right after `docker restart`)
+  in between checks. Closing this fully needs a shorter `--start-interval` (Docker 25+) so
+  checks run frequently during the 10-minute start period, which lives in the `HEALTHCHECK`
+  line in `Dockerfile` — a `[generated]` file per AI.md's ownership table. That line has no
+  ARG/ENV indirection to override per-repo, so this must be changed upstream in the
+  `gen-dockerfile` template repo, not here.
 - Impact: anything that gates traffic on Docker's health status (`docker-compose`
-  `depends_on: condition: service_healthy`, orchestrator health gates) could send requests
-  into this gap and get a connection reset instead of a retry-able error. Self-resolves
-  within seconds; no data loss observed.
-- Severity: Medium. Not fixed here — needs a decision on whether to add a stabilization
-  delay to the healthcheck script or have it check the published port itself rather than an
-  internal probe; out of scope for the commit that prompted this beta test.
+  `depends_on: condition: service_healthy`, orchestrator health gates) can still send
+  requests into this gap right after a restart and get a connection reset instead of a
+  retry-able error. Self-resolves within seconds; no data loss observed. The fix in this
+  repo makes the check itself meaningful; it does not change how often Docker runs it.
+- Severity: Medium → Low (residual). Follow-up: file/track a `gen-dockerfile` template
+  change adding `--start-interval=5s` (or similar) to the generated `HEALTHCHECK` line.
 
 ## Found, not verified — `git push` (HTTP + SSH) not exercised by beta test
 
