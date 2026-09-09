@@ -1,5 +1,64 @@
 # TODO.AI.md
 
+## Found, not fixed — stale `__copy_templates`/`DEFAULT_TEMPLATE_DIR` calls in functions/entrypoint.sh
+
+Found incidentally while running AI.md PART 8's dead-reference gate ("No `__copy_templates`
+calls remain (retired with `DEFAULT_TEMPLATE_DIR`)") before committing an unrelated set of
+fixes.
+
+- `rootfs/usr/local/etc/docker/functions/entrypoint.sh` still defines `__copy_templates`
+  (line 650) and calls it at lines 457, 459, 512, 519 — the exact pattern AI.md PART 8
+  documents as retired alongside `DEFAULT_TEMPLATE_DIR`.
+- `functions/entrypoint.sh` is a `gen-dockerfile`-generated file (per AI.md's ownership
+  rules) — per rule 2, this must be fixed in the upstream `gen-dockerfile` template and then
+  regenerated, not hand-edited in this repo. Not fixed here — out of scope for the current
+  commit and requires the upstream template repo, not this one.
+
+## App-breaking bug fixed — runner daemon cache secret key wrong (build/test cycle)
+
+Found while functionally testing the built image: after registration succeeded, the
+`act_runner daemon` process still logged `A cache secret must be specified to use an
+external cache server, cache will be disabled`, even though `ps aux` confirmed it was
+launched with `--config /config/act_runner/runners-cache.yaml` and that file contained a
+non-empty secret.
+
+- `rootfs/usr/local/bin/start-runners` (heredoc generating `runners-cache.yaml`, line 112):
+  used `external_secret:` under `cache:`. Verified via `strings /usr/local/bin/act_runner`
+  on the actual binary that this act_runner v13.1.0's embedded config schema uses `secret:`
+  for the client/daemon side too — `external_secret` is not a recognized key anywhere in
+  this binary version. Fixed to `secret: '${RUNNER_CACHE_SECRET}'`.
+- `rootfs/tmp/etc/act_runner/default_config.yaml` (`cache:` block, line 71): same wrong
+  key, same fix — `external_secret:` → `secret: 'REPLACE_RUNNER_CACHE_SECRET'`. This is the
+  template copied to `/config/act_runner/forgejo/act_runner.yaml` at container startup.
+
+## App-breaking bug fixed — runner registration token truncated by regex (build/test cycle)
+
+Found while functionally testing the built image: act_runner failed to register with
+`invalid_argument: runner registration token not found` even though a token was
+generated and written to `/config/act_runner/tokens/system`.
+
+- `rootfs/usr/local/etc/docker/init.d/zz-act_runner.sh` (`__gen_auth_token`, line 146):
+  `forgejo actions generate-runner-token` returns a token containing hyphens (verified
+  empirically, e.g. `FREHhNzKSoKU3KLpB3SwHLX1O1PvTAJGTZn2rmf--MR`), but the extraction
+  regex `grep -oE '[A-Za-z0-9]{20,}'` only matches alnum runs, so `tail -n1` returned
+  just the alnum prefix and silently dropped the `--MR` suffix — writing a truncated,
+  invalid token that Forgejo's API correctly rejects on registration. Fixed the regex to
+  `[A-Za-z0-9_-]{20,}` so the full token is captured.
+
+## App-breaking bug fixed — cache_server.yaml wrong config key (build/test cycle)
+
+Found while functionally testing the built image: `act_runner cache-server` exited
+immediately with `no cache secret was specified, exiting.` even though a secret was
+generated and injected.
+
+- `rootfs/tmp/etc/act_runner/cache_server.yaml`: used `external_secret` under `cache:`,
+  but `act_runner cache-server`'s config loader only recognizes `secret` (matches the
+  CLI's `--secret` flag; `external_secret` is the client-side key used in
+  `default_config.yaml`'s `cache:` block to point a *runner* at an *external* cache
+  server — not the key the cache-server itself reads). Verified empirically: same config
+  with `secret:` starts and runs cleanly; with `external_secret:` it exits immediately.
+  Fixed to `secret: 'REPLACE_RUNNER_CACHE_SECRET'`.
+
 ## App-breaking bug fixed — sshd_config AllowUsers mismatch (gitea→forgejo migration)
 
 Found incidentally while sweeping for remaining "gitea" references during the forgejo rename.
@@ -296,6 +355,19 @@ container:
   survived the restarts intact. Also verified admin user creation, repo creation, fork (into a second
   `forker` user account), and mirror+sync (`mirror_updated` timestamp advanced from mirror-registration
   time to a fresh sync time) all still work with no regressions from this fix.
+
+## AI.md compliance fixed — Dockerfile stale image.url and wrong HOSTNAME prefix
+
+Found while reading the full repo tree; not previously logged.
+
+- `Dockerfile` final stage: `LABEL org.opencontainers.image.url` used the stale
+  `https://docker.io/casjaysdevdocker/forgejo` registry-pull form. AI.md PART 0 rule 5
+  requires the browsable Docker Hub page URL. Fixed to
+  `https://hub.docker.com/r/casjaysdevdocker/forgejo`.
+- `Dockerfile` final stage: `ENV HOSTNAME="casjaysdev-${IMAGE_NAME}"` used the wrong org
+  prefix. AI.md PART 2's HOSTNAME convention requires `casjaysdevdocker-${IMAGE_NAME}`
+  (matching the build-stage `ENV HOSTNAME="casjaysdevdocker-forgejo"`, which was already
+  correct). Fixed to `casjaysdevdocker-${IMAGE_NAME}`.
 
 ## Non-issue — confirmed intentional (`.gitea/workflows/docker.yaml`)
 

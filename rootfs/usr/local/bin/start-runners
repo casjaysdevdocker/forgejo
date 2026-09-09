@@ -109,7 +109,7 @@ if [ -n "$RUNNER_CACHE_HOST" ] && [ -n "$RUNNER_CACHE_PORT" ] && [ -n "$RUNNER_C
 cache:
   enabled: true
   external_server: 'http://${RUNNER_CACHE_HOST}:${RUNNER_CACHE_PORT}/'
-  external_secret: '${RUNNER_CACHE_SECRET}'
+  secret: '${RUNNER_CACHE_SECRET}'
 EOF
 fi
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -

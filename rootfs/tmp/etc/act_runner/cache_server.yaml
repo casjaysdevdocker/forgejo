@@ -6,4 +6,4 @@ cache:
   dir: 'REPLACE_RUNNER_CACHE_DIR'
   host: '0.0.0.0'
   port: REPLACE_RUNNER_CACHE_PORT
-  external_secret: 'REPLACE_RUNNER_CACHE_SECRET'
+  secret: 'REPLACE_RUNNER_CACHE_SECRET'

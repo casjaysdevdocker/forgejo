@@ -207,7 +207,7 @@ LABEL org.opencontainers.image.description="Containerized version of ${IMAGE_NAM
 LABEL org.opencontainers.image.created="${BUILD_DATE}"
 LABEL org.opencontainers.image.version="${BUILD_VERSION}"
 LABEL org.opencontainers.image.revision="${GIT_COMMIT}"
-LABEL org.opencontainers.image.url="https://docker.io/casjaysdevdocker/forgejo"
+LABEL org.opencontainers.image.url="https://hub.docker.com/r/casjaysdevdocker/forgejo"
 LABEL org.opencontainers.image.source="https://github.com/casjaysdevdocker/forgejo"
 LABEL org.opencontainers.image.documentation="https://github.com/casjaysdevdocker/forgejo"
 LABEL org.opencontainers.image.vcs-type="Git"
@@ -224,7 +224,7 @@ ENV TERM="xterm-256color"
 ENV PORT="${SERVICE_PORT}"
 ENV ENV_PORTS="${ENV_PORTS}"
 ENV CONTAINER_NAME="${IMAGE_NAME}"
-ENV HOSTNAME="casjaysdev-${IMAGE_NAME}"
+ENV HOSTNAME="casjaysdevdocker-${IMAGE_NAME}"
 ENV PHP_SERVER="${PHP_SERVER}"
 ENV NODE_VERSION="${NODE_VERSION}"
 ENV NODE_MANAGER="${NODE_MANAGER}"
@@ -242,4 +242,3 @@ STOPSIGNAL SIGRTMIN+3
 
 ENTRYPOINT [ "tini", "-p", "SIGTERM","--", "/usr/local/bin/entrypoint.sh" ]
 HEALTHCHECK --start-period=10m --interval=5m --timeout=15s CMD [ "/usr/local/bin/entrypoint.sh", "healthcheck" ]
-

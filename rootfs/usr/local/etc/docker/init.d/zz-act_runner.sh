@@ -143,7 +143,7 @@ __gen_auth_token() {
 			auth_token="$( gosu $user $forgejo_bin --config "$conf_file" \
 				--work-path /data/forgejo --custom-path /config/forgejo/custom \
 				actions generate-runner-token 2>/dev/null | \
-				grep -oE -- '[A-Za-z0-9]{20,}' | tail -n1 )"
+				grep -oE -- '[A-Za-z0-9_-]{20,}' | tail -n1 )"
 		fi
 	fi
 	if [ -n "$auth_token" ]; then
