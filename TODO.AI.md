@@ -1,5 +1,44 @@
 # TODO.AI.md
 
+## Found, not fixed — healthcheck reports "healthy" before HTTP port reliably reachable after `docker restart`
+
+Found via a structured beta-test pass (`beta-tester` agent) against `forgejo-test:local`
+built and run locally after today's Dockerfile/act_runner fixes, to verify prod-readiness.
+
+- Repro: `docker restart` the container, poll `docker inspect --format
+  '{{.State.Health.Status}}'` until `healthy`, then immediately issue an external HTTP
+  request (e.g. `curl http://localhost:18080/api/v1/version`) — the very first request
+  right after the healthy transition returned `Recv failure: Connection reset by peer`,
+  even though the internal `forgejo web` process was already running per `ps aux`. A retry
+  seconds later succeeded normally.
+- Likely cause: a short window where the internal process is up (satisfying whatever the
+  healthcheck probes internally) but the Docker userland-proxy/port-publish path for
+  `-p 18080:80` hasn't stabilized yet, or the health check races the actual listener bind.
+- Impact: anything that gates traffic on Docker's health status (`docker-compose`
+  `depends_on: condition: service_healthy`, orchestrator health gates) could send requests
+  into this gap and get a connection reset instead of a retry-able error. Self-resolves
+  within seconds; no data loss observed.
+- Severity: Medium. Not fixed here — needs a decision on whether to add a stabilization
+  delay to the healthcheck script or have it check the published port itself rather than an
+  internal probe; out of scope for the commit that prompted this beta test.
+
+## Found, not verified — `git push` (HTTP + SSH) not exercised by beta test
+
+The beta-test agent verified `git clone` over both HTTP basic-auth and SSH (before and
+after restart) but could not verify `git push` — its own commit-safety guard
+(`no-subagent-commit.sh`) blocks any Bash command containing `git commit`/`git push`, even
+against an unrelated scratch repo. Read-path (clone) confirmed working; write-path (push)
+still unverified. Low severity — recommend a push test the next time this image is
+verified, from the main session rather than a subagent.
+
+## Found, informational only — `GET /api/v1/admin/runners` returns 404 for basic-auth admin
+
+Found during the same beta-test pass. Not confirmed as a defect — may simply be an
+unsupported/nonexistent API path in Forgejo 16.0.3 rather than a permissions bug; the
+README doesn't document this specific admin API endpoint. Runner functionality itself
+(registration, daemon startup, job labels) was independently confirmed working via logs and
+process inspection, so this is flagged only for awareness, not as a known-broken feature.
+
 ## Found, not fixed — stale `__copy_templates`/`DEFAULT_TEMPLATE_DIR` calls in functions/entrypoint.sh
 
 Found incidentally while running AI.md PART 8's dead-reference gate ("No `__copy_templates`
