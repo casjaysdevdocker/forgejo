@@ -14,7 +14,7 @@ docker run -d \
   --privileged \
   --restart always \
   --tty \
-  --cgroupns private \
+  --cgroupns=private \
   --hostname git.example.com \
   --domainname example.com \
   --network bridge \
@@ -55,11 +55,12 @@ services:
     tty: true
     restart: always
     logging: *default-logging
-    cgroupns_mode: private
+    cgroup: private
     cap_add:
       - CHOWN
       - SYS_TIME
       - SYS_ADMIN
+      - CAP_MKNOD
     environment:
       TZ: ${TZ:-America/New_York}
       CONTAINER_NAME: casjaysdevdocker-forgejo-latest
@@ -86,87 +87,87 @@ networks:
 
 **General**
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `TZ` | `America/New_York` | Timezone |
-| `DEBUGGER` | _(empty)_ | Set to `on` to enable shell-level debug tracing |
+| Variable   | Default            | Description                                     |
+| ---------- | ------------------ | ----------------------------------------------- |
+| `TZ`       | `America/New_York` | Timezone                                        |
+| `DEBUGGER` | _(empty)_          | Set to `on` to enable shell-level debug tracing |
 
 **Server / domain**
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `FORGEJO_SERVER` | `hostname -f` | Public FQDN — sets ROOT\_URL, DOMAIN, SSH\_DOMAIN, and all email addresses. **Always set this in production.** |
-| `FORGEJO_HOSTNAME` | _(empty)_ | Alias for `FORGEJO_SERVER` |
-| `FULL_DOMAIN_NAME` | _(empty)_ | Fallback FQDN used when neither `FORGEJO_SERVER` nor `FORGEJO_HOSTNAME` is set |
-| `DOMAIN` | _(empty)_ | Overrides the domain used in email addresses (takes precedence over `FORGEJO_SERVER`) |
-| `FORGEJO_PROTO` | `http` | Protocol used in ROOT\_URL (`http` or `https`) |
-| `FORGEJO_PORT` | `80` | Internal port Forgejo listens on |
-| `FORGEJO_NAME` | `SelfHosted GIT Server` | Site title shown in the UI |
-| `FORGEJO_TZ` | `$TZ` | Override timezone for Forgejo specifically |
-| `FORGEJO_WORK_DIR` | `/data/forgejo` | Override Forgejo's work path |
+| Variable           | Default                 | Description                                                                                                    |
+| ------------------ | ----------------------- | -------------------------------------------------------------------------------------------------------------- |
+| `FORGEJO_SERVER`   | `hostname -f`           | Public FQDN — sets ROOT\_URL, DOMAIN, SSH\_DOMAIN, and all email addresses. **Always set this in production.** |
+| `FORGEJO_HOSTNAME` | _(empty)_               | Alias for `FORGEJO_SERVER`                                                                                     |
+| `FULL_DOMAIN_NAME` | _(empty)_               | Fallback FQDN used when neither `FORGEJO_SERVER` nor `FORGEJO_HOSTNAME` is set                                 |
+| `DOMAIN`           | _(empty)_               | Overrides the domain used in email addresses (takes precedence over `FORGEJO_SERVER`)                          |
+| `FORGEJO_PROTO`    | `http`                  | Protocol used in ROOT\_URL (`http` or `https`)                                                                 |
+| `FORGEJO_PORT`     | `80`                    | Internal port Forgejo listens on                                                                               |
+| `FORGEJO_NAME`     | `SelfHosted GIT Server` | Site title shown in the UI                                                                                     |
+| `FORGEJO_TZ`       | `$TZ`                   | Override timezone for Forgejo specifically                                                                     |
+| `FORGEJO_WORK_DIR` | `/data/forgejo`         | Override Forgejo's work path                                                                                   |
 
 **Users**
 
-| Variable | Default | Description |
-|----------|---------|-------------|
+| Variable                 | Default   | Description                                           |
+| ------------------------ | --------- | ----------------------------------------------------- |
 | `FORGEJO_ROOT_USER_NAME` | _(empty)_ | Initial admin account username (created on first run) |
-| `FORGEJO_ROOT_PASS_WORD` | _(empty)_ | Initial admin account password |
-| `FORGEJO_USER_NAME` | _(empty)_ | Initial normal user username |
-| `FORGEJO_USER_PASS_WORD` | _(empty)_ | Initial normal user password |
+| `FORGEJO_ROOT_PASS_WORD` | _(empty)_ | Initial admin account password                        |
+| `FORGEJO_USER_NAME`      | _(empty)_ | Initial normal user username                          |
+| `FORGEJO_USER_PASS_WORD` | _(empty)_ | Initial normal user password                          |
 
 **Mail**
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `FORGEJO_ADMIN` | `administrator@<FORGEJO_SERVER>` | Admin contact / mailer FROM address |
-| `FORGEJO_EMAIL_RELAY` | `172.17.0.1` | SMTP relay host |
-| `FORGEJO_EMAIL_CONFIRM` | `false` | Set to `yes` to require email confirmation and enable the mailer |
+| Variable                | Default                          | Description                                                      |
+| ----------------------- | -------------------------------- | ---------------------------------------------------------------- |
+| `FORGEJO_ADMIN`         | `administrator@<FORGEJO_SERVER>` | Admin contact / mailer FROM address                              |
+| `FORGEJO_EMAIL_RELAY`   | `172.17.0.1`                     | SMTP relay host                                                  |
+| `FORGEJO_EMAIL_CONFIRM` | `false`                          | Set to `yes` to require email confirmation and enable the mailer |
 
 **Database**
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `FORGEJO_SQL_TYPE` | `sqlite3` | Database type (`sqlite3`, `mysql`, `postgres`) |
-| `FORGEJO_SQL_HOST` | `localhost` | Database host (external DB only) |
-| `FORGEJO_SQL_DB_HOST` | `$FORGEJO_SQL_HOST` | Alternate database host variable |
-| `FORGEJO_SQL_USER` | _(empty)_ | Database user (external DB only) |
-| `FORGEJO_SQL_PASS` | _(empty)_ | Database password (external DB only) |
-| `FORGEJO_SQL_NAME` | _(empty)_ | Database name (external DB only) |
+| Variable              | Default               | Description                                                                                          |
+| --------------------- | --------------------- | ---------------------------------------------------------------------------------------------------- |
+| `FORGEJO_SQL_TYPE`    | `sqlite3`             | Database type (`sqlite3`, `mysql`, `postgres`)                                                       |
+| `FORGEJO_SQL_HOST`    | `localhost`           | Database host (external DB only)                                                                     |
+| `FORGEJO_SQL_DB_HOST` | `$FORGEJO_SQL_HOST`   | Alternate database host variable                                                                     |
+| `FORGEJO_SQL_USER`    | _(empty)_             | Database user (external DB only)                                                                     |
+| `FORGEJO_SQL_PASS`    | _(empty)_             | Database password (external DB only)                                                                 |
+| `FORGEJO_SQL_NAME`    | _(empty)_             | Database name (external DB only)                                                                     |
 | `DATABASE_DIR_SQLITE` | `$DATA_DIR/db/sqlite` | Override the SQLite database directory (mount a separate volume here to keep the DB outside `/data`) |
 
 **act\_runner**
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `RUNNERS_START` | `5` | Number of act\_runner instances to register |
-| `RUNNER_CACHE_PORT` | `44015` | Port for the act\_runner cache server |
-| `RUNNER_IP_ADDRESS` | container IP | IP address act\_runner registers with Forgejo |
-| `RUNNER_DEFAULT_HOME` | `/config/act_runner/forgejo` | Directory where runner registration state is stored |
-| `RUNNER_CONFIG_NAME` | `act_runner.yaml` | Runner config filename inside `RUNNER_DEFAULT_HOME` |
-| `ACT_RUNNER_FALLBACK_VERSION` | `v13.1.0` | Pinned act\_runner version used if code.forgejo.org is unreachable during build |
+| Variable                      | Default                      | Description                                                                     |
+| ----------------------------- | ---------------------------- | ------------------------------------------------------------------------------- |
+| `RUNNERS_START`               | `5`                          | Number of act\_runner instances to register                                     |
+| `RUNNER_CACHE_PORT`           | `44015`                      | Port for the act\_runner cache server                                           |
+| `RUNNER_IP_ADDRESS`           | container IP                 | IP address act\_runner registers with Forgejo                                   |
+| `RUNNER_DEFAULT_HOME`         | `/config/act_runner/forgejo` | Directory where runner registration state is stored                             |
+| `RUNNER_CONFIG_NAME`          | `act_runner.yaml`            | Runner config filename inside `RUNNER_DEFAULT_HOME`                             |
+| `ACT_RUNNER_FALLBACK_VERSION` | `v13.1.0`                    | Pinned act\_runner version used if code.forgejo.org is unreachable during build |
 
 **Runner labels** are set automatically based on the host architecture. All jobs run inside Docker containers — no bare-metal execution.
 
-| Host arch | Labels registered |
-|-----------|------------------|
-| `x86_64` | `amd64:docker://ubuntu:latest`, `linux:docker://ubuntu:latest`, `linux/amd64:docker://ubuntu:latest`, + language images |
+| Host arch | Labels registered                                                                                                       |
+| --------- | ----------------------------------------------------------------------------------------------------------------------- |
+| `x86_64`  | `amd64:docker://ubuntu:latest`, `linux:docker://ubuntu:latest`, `linux/amd64:docker://ubuntu:latest`, + language images |
 | `aarch64` | `arm64:docker://ubuntu:latest`, `linux:docker://ubuntu:latest`, `linux/arm64:docker://ubuntu:latest`, + language images |
 
 Language image labels available on both architectures: `node` (14/16/18/20/22/latest), `perl`, `ruby`, `python`/`python3`, `php`/`php7`/`php8`, `alpine`, `debian`, `ubuntu`, `almalinux`/`rhel`/`redhat`, `ubuntu-latest`.
 
 ### Volumes
 
-| Path | Purpose |
-|------|---------|
-| `/data` | Repositories, SQLite database, LFS objects, attachments, indexes |
+| Path      | Purpose                                                                            |
+| --------- | ---------------------------------------------------------------------------------- |
+| `/data`   | Repositories, SQLite database, LFS objects, attachments, indexes                   |
 | `/config` | `app.ini`, SSH host keys, act\_runner config — persisted across container restarts |
 
 ### Ports
 
-| Port | Protocol | Purpose |
-|------|----------|---------|
-| `80` | TCP | Forgejo web UI and API |
-| `22` (internal) / `7833` (default external) | TCP | Git over SSH — host port 22 is typically taken by sshd; map container port 22 to an available host port and set `SSH_PORT` to match |
+| Port                                        | Protocol | Purpose                                                                                                                             |
+| ------------------------------------------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| `80`                                        | TCP      | Forgejo web UI and API                                                                                                              |
+| `22` (internal) / `7833` (default external) | TCP      | Git over SSH — host port 22 is typically taken by sshd; map container port 22 to an available host port and set `SSH_PORT` to match |
 
 ### Notes
 
@@ -217,6 +218,7 @@ act_runner register \
 ```
 
 Label format: `name:type:image` — all jobs run inside Docker containers, never directly on the host.
+
 - `arm64:docker://ubuntu:latest` — dispatched to this runner, job runs in a native arm64 Ubuntu container
 - `linux/arm64:docker://ubuntu:latest` — OCI-style label for the same runner
 - Docker must be installed and running on the host machine

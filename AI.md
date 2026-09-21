@@ -19,18 +19,18 @@ This file defines the standards that procedure enforces.
 
 # PART INDEX
 
-| PART | Title |
-|------|-------|
-| 0 | Critical rules |
-| 1 | Repository model & structure |
-| 2 | Template system reference |
-| 3 | Tooling — gen-dockerfile & gen-script |
-| 4 | `.env.scripts` reference |
-| 5 | Runtime system — setup scripts, entrypoint, init.d |
-| 6 | README.md standard layout |
-| 7 | CI/CD workflows |
-| 8 | Verification & commit |
-| 9 | Examples from real repos |
+| PART | Title                                              |
+| ---- | -------------------------------------------------- |
+| 0    | Critical rules                                     |
+| 1    | Repository model & structure                       |
+| 2    | Template system reference                          |
+| 3    | Tooling — gen-dockerfile & gen-script              |
+| 4    | `.env.scripts` reference                           |
+| 5    | Runtime system — setup scripts, entrypoint, init.d |
+| 6    | README.md standard layout                          |
+| 7    | CI/CD workflows                                    |
+| 8    | Verification & commit                              |
+| 9    | Examples from real repos                           |
 
 ---
 
@@ -38,10 +38,10 @@ This file defines the standards that procedure enforces.
 
 ## Org mapping
 
-| System | Org | Example |
-|--------|-----|---------|
-| GitHub (source) | `casjaysdevdocker` | `https://github.com/casjaysdevdocker/{name}` |
-| Docker Hub (push) | `casjaysdevdocker` | `casjaysdevdocker/{name}` |
+| System            | Org                | Example                                      |
+| ----------------- | ------------------ | -------------------------------------------- |
+| GitHub (source)   | `casjaysdevdocker` | `https://github.com/casjaysdevdocker/{name}` |
+| Docker Hub (push) | `casjaysdevdocker` | `casjaysdevdocker/{name}`                    |
 
 `casjaysdevdocker` repos are **applications** (gitea, opengist, super-productivity,
 ampache, aria2, …). They always build FROM the pre-built, multi-arch `casjaysdev/*` base
@@ -124,14 +124,14 @@ per the global project conventions — they are repo-owned and never touched by 
 The only valid directories at the `rootfs/` root are `root/`, `tmp/`, and `usr/`.
 Anything else is a leftover from old patterns. Migration map:
 
-| Old rootfs path | Correct rootfs path |
-|-----------------|---------------------|
-| `rootfs/etc/{path}` | `rootfs/tmp/etc/{path}` |
-| `rootfs/config/{path}` | `rootfs/tmp/etc/{path}` |
-| `rootfs/data/{path}` | `rootfs/tmp/var/{path}` |
-| `rootfs/var/{path}` | `rootfs/tmp/var/{path}` |
-| `rootfs/opt/{path}` | `rootfs/tmp/opt/{path}` |
-| `rootfs/share/{path}` | `rootfs/usr/local/share/{path}` |
+| Old rootfs path        | Correct rootfs path             |
+| ---------------------- | ------------------------------- |
+| `rootfs/etc/{path}`    | `rootfs/tmp/etc/{path}`         |
+| `rootfs/config/{path}` | `rootfs/tmp/etc/{path}`         |
+| `rootfs/data/{path}`   | `rootfs/tmp/var/{path}`         |
+| `rootfs/var/{path}`    | `rootfs/tmp/var/{path}`         |
+| `rootfs/opt/{path}`    | `rootfs/tmp/opt/{path}`         |
+| `rootfs/share/{path}`  | `rootfs/usr/local/share/{path}` |
 
 `rootfs/usr/local/share/template-files/` is retired — the `DEFAULT_TEMPLATE_DIR`,
 `DEFAULT_FILE_DIR`, `DEFAULT_DATA_DIR`, and `DEFAULT_CONF_DIR` variables were removed
@@ -171,15 +171,15 @@ the templates change.
 The template name selects the base OS family; for an app repo the resulting pull URL is
 always the matching `casjaysdev/*` image:
 
-| Template | Final stage | Init / PID 1 | App pulls FROM |
-|----------|-------------|--------------|----------------|
-| `alpine.template` | `scratch.template` | tini | `casjaysdev/alpine` |
-| `debian.template` | `scratch.template` | tini | `casjaysdev/debian` |
-| `ubuntu.template` | `scratch.template` | tini | `casjaysdev/ubuntu` |
-| `rhel.template` | `scratch.template` | tini | `casjaysdev/almalinux` |
-| `archlinux.template` | `scratch.template` | tini | `casjaysdev/archlinux` (multi-arch manifest) |
-| `web.template` | `systemd.template` | `/sbin/init` | `casjaysdev/web` |
-| `xorg.template` | `systemd.template` | `/sbin/init` | `casjaysdev/xorg` |
+| Template             | Final stage        | Init / PID 1 | App pulls FROM                               |
+| -------------------- | ------------------ | ------------ | -------------------------------------------- |
+| `alpine.template`    | `scratch.template` | tini         | `casjaysdev/alpine`                          |
+| `debian.template`    | `scratch.template` | tini         | `casjaysdev/debian`                          |
+| `ubuntu.template`    | `scratch.template` | tini         | `casjaysdev/ubuntu`                          |
+| `rhel.template`      | `scratch.template` | tini         | `casjaysdev/almalinux`                       |
+| `archlinux.template` | `scratch.template` | tini         | `casjaysdev/archlinux` (multi-arch manifest) |
+| `web.template`       | `systemd.template` | `/sbin/init` | `casjaysdev/web`                             |
+| `xorg.template`      | `systemd.template` | `/sbin/init` | `casjaysdev/xorg`                            |
 
 Default template for app repos is `alpine` unless the application needs systemd, a GUI
 stack, or a distro-specific package.
@@ -187,10 +187,12 @@ stack, or a distro-specific package.
 ## Final-stage templates
 
 `scratch.template` — all non-GUI templates.
+
 - `ENTRYPOINT [ "tini", "-p", "SIGTERM","--", "/usr/local/bin/entrypoint.sh" ]`
 - `STOPSIGNAL SIGRTMIN+3`
 
 `systemd.template` — `web` and `xorg` (systemd is PID 1; tini is redundant).
+
 - `ENTRYPOINT [ "/sbin/init" ]`
 - `STOPSIGNAL SIGRTMIN+3`
 - No `tini_provider` stage, no `COPY --from=tini_provider` line.
@@ -225,14 +227,15 @@ generated `Dockerfile`.
 
 Resolved values for a `casjaysdevdocker` repo pushing to Docker Hub:
 
-| Label | Value |
-|-------|-------|
-| `url` | `https://hub.docker.com/r/casjaysdevdocker/{name}` — browsable Hub page; `gen-dockerfile` derives it from the registry host (`docker.io` → `hub.docker.com/r/`) |
-| `source` | `https://github.com/casjaysdevdocker/{name}` |
-| `documentation` | `https://github.com/casjaysdevdocker/{name}` |
+| Label           | Value                                                                                                                                                           |
+| --------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `url`           | `https://hub.docker.com/r/casjaysdevdocker/{name}` — browsable Hub page; `gen-dockerfile` derives it from the registry host (`docker.io` → `hub.docker.com/r/`) |
+| `source`        | `https://github.com/casjaysdevdocker/{name}`                                                                                                                    |
+| `documentation` | `https://github.com/casjaysdevdocker/{name}`                                                                                                                    |
 
 Older app repos may still carry `url="https://docker.io/casjaysdevdocker/{name}"` — that
 is the stale form; regeneration corrects it. Removed labels (never re-add):
+
 - `org.opencontainers.image.base.name` — belongs on the base image, not this image
 - `org.opencontainers.image.schema-version` — non-spec; redundant with `version`
 - Any duplicate `authors` or `source` entries
@@ -307,22 +310,22 @@ variable overrides.
 Usage: gen-dockerfile [options] [dir] [template] [repo-name] [git-repo-url]
 ```
 
-| Flag | Meaning |
-|------|---------|
-| `--update` | Rewrite `.env.scripts` (add/drop vars against the current template) and update ARG/LABEL lines in the `Dockerfile`. Touches no other file. |
-| `--nogit` | Do not init or commit a git repo — required inside an existing repo. |
-| `--dir PATH` | Operate on / write output to PATH instead of `$PWD`. |
-| `--template NAME` | Template to use (`alpine`, `debian`, `ubuntu`, `rhel`, `archlinux`, `scratch`, `web`, `xorg`). Defaults to `alpine`. |
-| `--repo NAME` | Registry repo name (image basename). Defaults to the directory name. |
-| `--org NAME` | Registry owner / GitHub org (`--user` is an alias). Prefix `git:` or `reg:` to scope to one system; bare value sets both. For app repos both are `casjaysdevdocker`. |
-| `--registry URL` | Registry provider URL (e.g. `https://docker.io`). |
-| `--tag VERSION` | Image version tag (default `latest`). |
-| `--add-tags TAGS` | Comma-separated additional tags (`USE_DATE` = auto date tag). |
-| `--distro-name IMG` | Base image pull URL (overrides `ENV_PULL_URL`). |
-| `--distro-version T` | Base image tag (overrides `ENV_DISTRO_TAG`). |
-| `--startup FILE` | Generate an init.d service script at `rootfs/usr/local/etc/docker/init.d/FILE` via `gen-script other/start-service`. |
-| `--dockerfile` | Regenerate the Dockerfile only. |
-| `--force` | Overwrite existing files without prompting. |
+| Flag                 | Meaning                                                                                                                                                              |
+| -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `--update`           | Rewrite `.env.scripts` (add/drop vars against the current template) and update ARG/LABEL lines in the `Dockerfile`. Touches no other file.                           |
+| `--nogit`            | Do not init or commit a git repo — required inside an existing repo.                                                                                                 |
+| `--dir PATH`         | Operate on / write output to PATH instead of `$PWD`.                                                                                                                 |
+| `--template NAME`    | Template to use (`alpine`, `debian`, `ubuntu`, `rhel`, `archlinux`, `scratch`, `web`, `xorg`). Defaults to `alpine`.                                                 |
+| `--repo NAME`        | Registry repo name (image basename). Defaults to the directory name.                                                                                                 |
+| `--org NAME`         | Registry owner / GitHub org (`--user` is an alias). Prefix `git:` or `reg:` to scope to one system; bare value sets both. For app repos both are `casjaysdevdocker`. |
+| `--registry URL`     | Registry provider URL (e.g. `https://docker.io`).                                                                                                                    |
+| `--tag VERSION`      | Image version tag (default `latest`).                                                                                                                                |
+| `--add-tags TAGS`    | Comma-separated additional tags (`USE_DATE` = auto date tag).                                                                                                        |
+| `--distro-name IMG`  | Base image pull URL (overrides `ENV_PULL_URL`).                                                                                                                      |
+| `--distro-version T` | Base image tag (overrides `ENV_DISTRO_TAG`).                                                                                                                         |
+| `--startup FILE`     | Generate an init.d service script at `rootfs/usr/local/etc/docker/init.d/FILE` via `gen-script other/start-service`.                                                 |
+| `--dockerfile`       | Regenerate the Dockerfile only.                                                                                                                                      |
+| `--force`            | Overwrite existing files without prompting.                                                                                                                          |
 
 Resolution order when a value is not given by a flag: flags → git remote → project dirs →
 defaults.
@@ -336,14 +339,14 @@ the existing `Dockerfile` (PART 7). App repos have no versioned `build.{ver}.yml
 Usage: gen-script [options] [template] [filename]
 ```
 
-| Flag / env var | Meaning |
-|----------------|---------|
-| `--dir PATH` | Write the generated file to `PATH/filename`. |
-| `-n` / `--name VALUE` | Service name substituted into the template — fills `REPLACE_SERVICE_NAME` in `other/start-service`, pre-populating `SERVICE_NAME=` without a sed step. |
-| `GEN_SCRIPT_OVERWRITE="Y"` | Overwrite the output without prompting (default `"A"` = ask). Required when the target exists, even with `GEN_SCRIPT_EDITFILE="N"`. |
-| `GEN_SCRIPT_EDITFILE="N"` | Suppress the interactive editor after generation. `-e`/`--no` sets BOTH this AND `GEN_SCRIPT_OVERWRITE="Y"`; the env var alone does not. |
-| `other/start-service` | Template path — positional arg 1, slash-joined words, matching the `@@Template` header. |
-| `filename` | Output basename — positional arg 2, combined with `--dir`. |
+| Flag / env var             | Meaning                                                                                                                                                |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `--dir PATH`               | Write the generated file to `PATH/filename`.                                                                                                           |
+| `-n` / `--name VALUE`      | Service name substituted into the template — fills `REPLACE_SERVICE_NAME` in `other/start-service`, pre-populating `SERVICE_NAME=` without a sed step. |
+| `GEN_SCRIPT_OVERWRITE="Y"` | Overwrite the output without prompting (default `"A"` = ask). Required when the target exists, even with `GEN_SCRIPT_EDITFILE="N"`.                    |
+| `GEN_SCRIPT_EDITFILE="N"`  | Suppress the interactive editor after generation. `-e`/`--no` sets BOTH this AND `GEN_SCRIPT_OVERWRITE="Y"`; the env var alone does not.               |
+| `other/start-service`      | Template path — positional arg 1, slash-joined words, matching the `@@Template` header.                                                                |
+| `filename`                 | Output basename — positional arg 2, combined with `--dir`.                                                                                             |
 
 Other flags: `-k`/`--keep` (never overwrite), `--replace` (new header replaces old),
 `-d`/`--desc` (header description), `-p`/`--prev` (copy header metadata from a file).
@@ -357,39 +360,39 @@ repos carry exactly one. It is a pure `KEY="value"` file — no logic.
 
 ## Variables
 
-| Variable | Purpose |
-|----------|---------|
-| `ENV_DOCKERFILE` | Dockerfile to build (`Dockerfile`) |
-| `ENV_REGISTRY_REPO` | Image name in the registry (`{name}`) |
-| `ENV_REGISTRY_ORG` | Registry namespace — `casjaysdevdocker` for app repos |
-| `ENV_REGISTRY_URL` | Registry base URL (`https://docker.io`) — pull/push host, never a label URL |
-| `ENV_REGISTRY_PUSH` | Full push path `org/repo` (`casjaysdevdocker/{name}`) |
-| `ENV_ADD_IMAGE_PUSH` | Extra push destinations |
-| `ENV_GIT_REPO_URL` | Full Git repo URL — `https://github.com/casjaysdevdocker/{name}`; feeds the `source`/`documentation` labels, so a wrong value here regresses labels on regeneration |
-| `ENV_USE_TEMPLATE` | Template name (`alpine`, `debian`, …) — the authoritative record of which base family the app builds on |
-| `ENV_PULL_URL` | Base image to pull FROM (`casjaysdev/<base>`) |
-| `ENV_DISTRO_TAG` | Tag for the pull image (`latest`) |
-| `ENV_IMAGE_TAG` | Default image tag (`latest`) |
-| `ENV_ADD_TAGS` | Additional comma-separated tags; `USE_DATE` auto-generates a date tag |
-| `ENV_PACKAGES` | Space-separated package list |
-| `ENV_VENDOR` / `ENV_AUTHOR` / `ENV_MAINTAINER` | Label metadata |
-| `SERVICE_PORT` | Primary exposed port — apps normally set this |
-| `EXPOSE_PORTS` | Additional exposed ports |
-| `PHP_VERSION` / `NODE_VERSION` / `NODE_MANAGER` | Runtime versions (`system` default) |
-| `WWW_ROOT_DIR` | Web root (`/usr/local/share/httpd/default`) |
-| `DOCKER_ENTYPOINT_PORTS_WEB` / `DOCKER_ENTYPOINT_PORTS_SRV` | Ports passed to the entrypoint |
-| `DOCKER_ENTYPOINT_HEALTH_APPS` / `DOCKER_ENTYPOINT_HEALTH_ENDPOINTS` | Healthcheck targets |
+| Variable                                                             | Purpose                                                                                                                                                             |
+| -------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ENV_DOCKERFILE`                                                     | Dockerfile to build (`Dockerfile`)                                                                                                                                  |
+| `ENV_REGISTRY_REPO`                                                  | Image name in the registry (`{name}`)                                                                                                                               |
+| `ENV_REGISTRY_ORG`                                                   | Registry namespace — `casjaysdevdocker` for app repos                                                                                                               |
+| `ENV_REGISTRY_URL`                                                   | Registry base URL (`https://docker.io`) — pull/push host, never a label URL                                                                                         |
+| `ENV_REGISTRY_PUSH`                                                  | Full push path `org/repo` (`casjaysdevdocker/{name}`)                                                                                                               |
+| `ENV_ADD_IMAGE_PUSH`                                                 | Extra push destinations                                                                                                                                             |
+| `ENV_GIT_REPO_URL`                                                   | Full Git repo URL — `https://github.com/casjaysdevdocker/{name}`; feeds the `source`/`documentation` labels, so a wrong value here regresses labels on regeneration |
+| `ENV_USE_TEMPLATE`                                                   | Template name (`alpine`, `debian`, …) — the authoritative record of which base family the app builds on                                                             |
+| `ENV_PULL_URL`                                                       | Base image to pull FROM (`casjaysdev/<base>`)                                                                                                                       |
+| `ENV_DISTRO_TAG`                                                     | Tag for the pull image (`latest`)                                                                                                                                   |
+| `ENV_IMAGE_TAG`                                                      | Default image tag (`latest`)                                                                                                                                        |
+| `ENV_ADD_TAGS`                                                       | Additional comma-separated tags; `USE_DATE` auto-generates a date tag                                                                                               |
+| `ENV_PACKAGES`                                                       | Space-separated package list                                                                                                                                        |
+| `ENV_VENDOR` / `ENV_AUTHOR` / `ENV_MAINTAINER`                       | Label metadata                                                                                                                                                      |
+| `SERVICE_PORT`                                                       | Primary exposed port — apps normally set this                                                                                                                       |
+| `EXPOSE_PORTS`                                                       | Additional exposed ports                                                                                                                                            |
+| `PHP_VERSION` / `NODE_VERSION` / `NODE_MANAGER`                      | Runtime versions (`system` default)                                                                                                                                 |
+| `WWW_ROOT_DIR`                                                       | Web root (`/usr/local/share/httpd/default`)                                                                                                                         |
+| `DOCKER_ENTYPOINT_PORTS_WEB` / `DOCKER_ENTYPOINT_PORTS_SRV`          | Ports passed to the entrypoint                                                                                                                                      |
+| `DOCKER_ENTYPOINT_HEALTH_APPS` / `DOCKER_ENTYPOINT_HEALTH_ENDPOINTS` | Healthcheck targets                                                                                                                                                 |
 
 ## Legacy variable auto-migration
 
 `gen-dockerfile` calls `__migrate_env_script` on every run, renaming old variables:
 
-| Old name | Current name |
-|----------|-------------|
+| Old name         | Current name        |
+| ---------------- | ------------------- |
 | `ENV_IMAGE_NAME` | `ENV_REGISTRY_REPO` |
 | `ENV_IMAGE_PUSH` | `ENV_REGISTRY_PUSH` |
-| `ENV_HUB_BASE` | `ENV_REGISTRY_URL` |
-| `ENV_ORG_NAME` | `ENV_REGISTRY_ORG` |
+| `ENV_HUB_BASE`   | `ENV_REGISTRY_URL`  |
+| `ENV_ORG_NAME`   | `ENV_REGISTRY_ORG`  |
 
 Never use the old names in new files. Retired variables that must not reappear anywhere:
 `DEFAULT_TEMPLATE_DIR`, `DEFAULT_FILE_DIR`, `DEFAULT_DATA_DIR`, `DEFAULT_CONF_DIR`.
@@ -402,16 +405,16 @@ Never use the old names in new files. Retired variables that must not reappear a
 
 Run in order inside the build stage:
 
-| Script | Role |
-|--------|------|
-| `00-init.sh` | Initialize base directory structure and environment |
-| `01-system.sh` | Repos, locales, timezone, system settings |
-| `02-packages.sh` | App-specific packages, package managers, language runtimes |
-| `03-files.sh` | Install staged files (`rootfs/tmp/etc/*` → `/etc/*`), permissions, symlinks |
-| `04-users.sh` | Create service users/groups |
-| `05-custom.sh` | Application install logic — the heart of an app repo |
-| `06-post.sh` | Post-install configuration |
-| `07-cleanup.sh` | Remove build deps, caches, temp files |
+| Script           | Role                                                                        |
+| ---------------- | --------------------------------------------------------------------------- |
+| `00-init.sh`     | Initialize base directory structure and environment                         |
+| `01-system.sh`   | Repos, locales, timezone, system settings                                   |
+| `02-packages.sh` | App-specific packages, package managers, language runtimes                  |
+| `03-files.sh`    | Install staged files (`rootfs/tmp/etc/*` → `/etc/*`), permissions, symlinks |
+| `04-users.sh`    | Create service users/groups                                                 |
+| `05-custom.sh`   | Application install logic — the heart of an app repo                        |
+| `06-post.sh`     | Post-install configuration                                                  |
+| `07-cleanup.sh`  | Remove build deps, caches, temp files                                       |
 
 **`05-custom.sh` ownership:** the upstream template ships an empty stub. An app repo's
 `05-custom.sh` carries the application install (download/build, users, default config) —
@@ -490,19 +493,19 @@ USER_FILE_PREFIX="/config/secure/auth/user"
 The `start-service` template generates all outer hooks fully implemented — customise via
 the matching `*_local()` stub, which each outer hook calls automatically if defined:
 
-| Outer hook (do not redefine) | Customise via |
-|------------------------------|---------------|
-| `__run_precopy` | `__run_precopy_local` |
-| `__execute_prerun` | `__execute_prerun_local` |
-| `__run_pre_execute_checks` | `__run_pre_execute_checks_local` |
-| `__update_conf_files` | `__update_conf_files_local` |
-| `__pre_execute` | `__pre_execute_local` |
-| `__post_execute` | `__post_execute_local` |
-| `__pre_message` | `__pre_message_local` |
-| `__update_ssl_conf` | `__update_ssl_conf_local` |
-| `__create_service_env` | — |
-| `__run_start_script` | — |
-| `__run_secure_function` | — |
+| Outer hook (do not redefine) | Customise via                    |
+| ---------------------------- | -------------------------------- |
+| `__run_precopy`              | `__run_precopy_local`            |
+| `__execute_prerun`           | `__execute_prerun_local`         |
+| `__run_pre_execute_checks`   | `__run_pre_execute_checks_local` |
+| `__update_conf_files`        | `__update_conf_files_local`      |
+| `__pre_execute`              | `__pre_execute_local`            |
+| `__post_execute`             | `__post_execute_local`           |
+| `__pre_message`              | `__pre_message_local`            |
+| `__update_ssl_conf`          | `__update_ssl_conf_local`        |
+| `__create_service_env`       | —                                |
+| `__run_start_script`         | —                                |
+| `__run_secure_function`      | —                                |
 
 ## PID sentinel guard
 
@@ -744,8 +747,8 @@ ACT_VERSIONS="$(curl -q --connect-timeout 30 --max-time 45 -LSsf \
 # Fall back to pinned version if API is unreachable
 [ -z "$ACT_VERSIONS" ] && ACT_VERSIONS="$ACT_RUNNER_FALLBACK_VERSION"
 if [ -z "$GITEA_VERSION" ] || [ "$GITEA_VERSION" = "latest" ]; then
-	_latest_url="$(curl -4sfL -o /dev/null -w '%{url_effective}' https://github.com/go-gitea/gitea/releases/latest 2>/dev/null)"
-	GITEA_VERSION="$(printf '%s\n' "$_latest_url" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+')"
+ _latest_url="$(curl -4sfL -o /dev/null -w '%{url_effective}' https://github.com/go-gitea/gitea/releases/latest 2>/dev/null)"
+ GITEA_VERSION="$(printf '%s\n' "$_latest_url" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+')"
 fi
 GITEA_URL="https://github.com/go-gitea/gitea/releases/download/v${GITEA_VERSION}/gitea-${GITEA_VERSION}-linux-${ARCH}"
 ```
@@ -814,11 +817,11 @@ the template function body:
 ```bash
 # function to run before executing
 __pre_execute() {
-	local exitCode=0
-	...
-	# allow custom functions
-	if builtin type -t __pre_execute_local | grep -q 'function'; then __pre_execute_local; fi
-	return $exitCode
+ local exitCode=0
+ ...
+ # allow custom functions
+ if builtin type -t __pre_execute_local | grep -q 'function'; then __pre_execute_local; fi
+ return $exitCode
 }
 ```
 

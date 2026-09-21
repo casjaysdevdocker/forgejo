@@ -1,6 +1,8 @@
 name: gitea
 
-on: push
+on:
+  push:
+  workflow_dispatch:
 
 jobs:
   release-gitea:
@@ -65,4 +67,3 @@ jobs:
           tags: |
             ${{ steps.meta.outputs.DOCKER_HUB }}/${{ steps.meta.outputs.DOCKER_ORG }}/${{ steps.meta.outputs.REPO_NAME }}:${{ steps.meta.outputs.DATE_TAG }}
             ${{ steps.meta.outputs.DOCKER_HUB }}/${{ steps.meta.outputs.DOCKER_ORG }}/${{ steps.meta.outputs.REPO_NAME }}:${{ steps.meta.outputs.DOCKER_TAG }}
-

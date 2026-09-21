@@ -5,11 +5,14 @@
   "experimental": true,
   "pidfile": "/tmp/docker.pid",
   "cgroup-parent": "/docker",
-  "storage-driver": "fuse-overlayfs",
+  "storage-driver": "vfs",
+  "insecure-registries": ["localhost"],
+  "features": {
+    "containerd-snapshotter": false
+  },
   "default-address-pools": [
-    {"base": "172.17.0.0/12", "size": 24},
-    {"base": "192.168.0.0/16", "size": 24},
-    {"base": "10.0.0.0/8", "size": 24}
-  ],
-  "insecure-registries": ["localhost"]
+    { "base": "172.17.0.0/12", "size": 24 },
+    { "base": "192.168.0.0/16", "size": 24 },
+    { "base": "10.0.0.0/8", "size": 24 }
+  ]
 }
