@@ -279,7 +279,7 @@ __run_precopy() {
 	if [ -d "$ETC_DIR" ] && ! [ -L "$ETC_DIR" ]; then
 		if [ ! -f "$CONF_DIR/.initialized" ]; then
 			mkdir -p "$CONF_DIR"
-			cp -Rf "$ETC_DIR/." "$CONF_DIR/" 2>/dev/null || true
+			cp -Rn "$ETC_DIR/." "$CONF_DIR/" 2>/dev/null || true
 		fi
 		rm -Rf "$ETC_DIR"
 		ln -sf "$CONF_DIR" "$ETC_DIR"

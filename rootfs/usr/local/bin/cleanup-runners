@@ -1,0 +1,95 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+# - - - - - - - - - - - - - - - - - - - - - - - - -
+##@Version           :  202610051200-git
+# @@Author           :  Jason Hempstead
+# @@Contact          :  jason@casjaysdev.pro
+# @@License          :  LICENSE.md
+# @@ReadME           :  cleanup-runners --help
+# @@Copyright        :  Copyright: (c) 2026 Jason Hempstead, Casjays Developments
+# @@Description      :  Prune docker and act cache leftovers from act runner jobs
+# - - - - - - - - - - - - - - - - - - - - - - - - -
+VERSION="202610051200-git"
+set -eo pipefail
+
+RUNNER_CLEANUP_UNTIL="${RUNNER_CLEANUP_UNTIL:-72h}"
+RUNNER_CLEANUP_DISK_PERCENT="${RUNNER_CLEANUP_DISK_PERCENT:-80}"
+RUNNER_CLEANUP_DOCKER_DIR="${RUNNER_CLEANUP_DOCKER_DIR:-/data/docker}"
+RUNNER_CLEANUP_ACT_CACHE_DAYS="${RUNNER_CLEANUP_ACT_CACHE_DAYS:-7}"
+RUNNER_CLEANUP_ACT_CACHE_DIRS="${RUNNER_CLEANUP_ACT_CACHE_DIRS:-$HOME/.cache/act /root/.cache/act}"
+RUNNER_CLEANUP_LOG_FILE="${RUNNER_CLEANUP_LOG_FILE:-/data/logs/act_runner/cleanup.log}"
+if ! [[ "$RUNNER_CLEANUP_DISK_PERCENT" =~ ^(100|[0-9]{1,2})$ ]]; then
+	RUNNER_CLEANUP_DISK_PERCENT=80
+fi
+
+__log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" >>"$RUNNER_CLEANUP_LOG_FILE" 2>&1; }
+__prune() {
+	local output=""
+	if output=$("$@" 2>&1); then
+		__log "$* :: $(printf '%s\n' "$output" | grep -i -- 'reclaimed' | tail -n1)"
+	else
+		__log "FAILED: $* :: $output"
+	fi
+}
+__disk_percent() {
+	df -P "$1" 2>/dev/null | awk 'NR==2 {gsub("%", "", $5); print $5}'
+}
+__help() {
+	cat <<'EOF'
+Usage: cleanup-runners [--help|--version]
+
+Prune stale Docker runner resources, build cache, images, and act runner
+cache entries. Only explicitly dangling volumes matching the act- prefix are removed.
+
+Environment:
+  RUNNER_CLEANUP_UNTIL           Docker prune age (default: 72h)
+  RUNNER_CLEANUP_DISK_PERCENT    Image cleanup threshold (default: 80)
+  RUNNER_CLEANUP_DOCKER_DIR      Docker data path (default: /data/docker)
+  RUNNER_CLEANUP_ACT_CACHE_DAYS  Cache age in days (default: 7)
+  RUNNER_CLEANUP_ACT_CACHE_DIRS  Space-separated act cache directories
+  RUNNER_CLEANUP_LOG_FILE        Cleanup log path
+EOF
+}
+
+case "${1:-}" in
+	-h|--help)
+		__help
+		exit 0
+		;;
+	--version)
+		echo "$VERSION"
+		exit 0
+		;;
+esac
+
+mkdir -p "$(dirname -- "$RUNNER_CLEANUP_LOG_FILE")"
+if ! docker info >/dev/null 2>&1; then
+	__log "docker is not reachable, skipping Docker cleanup"
+else
+	__log "Starting cleanup"
+	__prune docker container prune -f --filter "until=$RUNNER_CLEANUP_UNTIL"
+	__prune docker network prune -f --filter "until=$RUNNER_CLEANUP_UNTIL"
+	act_volumes="$(docker volume ls -q --filter dangling=true --filter name=act- 2>/dev/null | grep -E -- '^act-' || true)"
+	if [ -n "$act_volumes" ]; then
+		# shellcheck disable=SC2086
+		__prune docker volume rm $act_volumes
+	fi
+	__prune docker builder prune -af --filter "until=$RUNNER_CLEANUP_UNTIL"
+	__prune docker image prune -f --filter "until=$RUNNER_CLEANUP_UNTIL"
+	disk_used="$(__disk_percent "$RUNNER_CLEANUP_DOCKER_DIR" || true)"
+	if [[ "$disk_used" =~ ^[0-9]+$ ]] && [ "$disk_used" -ge "$RUNNER_CLEANUP_DISK_PERCENT" ]; then
+		__log "$RUNNER_CLEANUP_DOCKER_DIR is ${disk_used}% used (limit ${RUNNER_CLEANUP_DISK_PERCENT}%), removing unused images"
+		__prune docker image prune -af --filter "until=$RUNNER_CLEANUP_UNTIL"
+	fi
+fi
+
+if [[ "$RUNNER_CLEANUP_ACT_CACHE_DAYS" =~ ^[1-9][0-9]*$ ]]; then
+	for act_cache_dir in $RUNNER_CLEANUP_ACT_CACHE_DIRS; do
+		[ -d "$act_cache_dir" ] || continue
+		removed="$(find "$act_cache_dir" -mindepth 1 -maxdepth 1 -mtime +"$RUNNER_CLEANUP_ACT_CACHE_DAYS" 2>/dev/null | wc -l || true)"
+		find "$act_cache_dir" -mindepth 1 -maxdepth 1 -mtime +"$RUNNER_CLEANUP_ACT_CACHE_DAYS" -exec rm -rf {} + 2>/dev/null || true
+		__log "Removed $removed stale entries from $act_cache_dir"
+	done
+fi
+__log "Cleanup finished"
+exit 0

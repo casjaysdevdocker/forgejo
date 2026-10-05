@@ -28,6 +28,34 @@ echo "${emoji}Fatal error occurred: Exit code $retVal at line $LINENO in command
 kill -TERM 1' ERR
 trap 'retVal=$?;if [ "$SERVICE_IS_RUNNING" != "yes" ] && [ -f "$SERVICE_PID_FILE" ]; then rm -Rf "$SERVICE_PID_FILE"; fi;exit $retVal' SIGINT SIGTERM SIGPWR
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+__help() {
+	cat <<'EOF'
+Usage: start-runners
+
+Register and start one or more Forgejo act_runner daemons in parallel.
+
+Environment:
+  SERVER_ADDRESS       Forgejo server URL (defaults to http://$HOSTNAME)
+  SERVER_TOKEN         Required runner registration token
+  RUNNERS_LOG_DIR      Runner log directory
+  RUNNERS_START        Number of runners to start (default: 1)
+  RUNNER_NAME_PREFIX   Runner name prefix (default: runner)
+  RUNNER_LABELS        Comma-separated runner labels
+  RUNNERS_CONFIG_BASE  Base act_runner config file
+  RUNNER_CACHE_HOST    External cache host (used with RUNNER_CACHE_PORT and
+                       RUNNER_CACHE_SECRET when no base config is available)
+  RUNNER_CACHE_PORT    External cache port
+  RUNNER_CACHE_SECRET  External cache secret
+EOF
+}
+
+case "${1:-}" in
+	-h|--help)
+		__help
+		exit 0
+		;;
+esac
+
 # Function to __log messages with timestamp
 __log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" >>"$RUNNERS_LOG_DIR/runners" 2>&1; }
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -100,29 +128,55 @@ __log "Starting $RUNNERS_START act_runner instance(s)"
 __log "Server Address: $SERVER_ADDRESS"
 __log "Runner Name Prefix: ${RUNNER_NAME_PREFIX:-runner}"
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-# Shared cache config so runner-N instances use the same cache-server
-# started by zz-act_runner.sh instead of an unshared per-process cache.
+# Full base config rendered by zz-act_runner.sh. Fall back to a shared cache-only
+# config when this script is invoked without a rendered Forgejo runner config.
+RUNNERS_DEFAULT_HOME="${RUNNER_DEFAULT_HOME:-/config/act_runner/forgejo}"
+# Keep the established registration path by default; callers may override it
+# independently when relocating runner state.
+RUNNERS_REGISTRATION_ROOT="${RUNNER_REGISTRATION_ROOT:-/config/act_runner/reg}"
 RUNNERS_CACHE_CONFIG=""
-if [ -n "$RUNNER_CACHE_HOST" ] && [ -n "$RUNNER_CACHE_PORT" ] && [ -n "$RUNNER_CACHE_SECRET" ]; then
+if [ -n "$RUNNERS_CONFIG_BASE" ] && [ -f "$RUNNERS_CONFIG_BASE" ]; then
+	__log "Base config: $RUNNERS_CONFIG_BASE"
+elif [ -n "$RUNNER_CACHE_HOST" ] && [ -n "$RUNNER_CACHE_PORT" ] && [ -n "$RUNNER_CACHE_SECRET" ]; then
+	RUNNERS_CONFIG_BASE=""
 	RUNNERS_CACHE_CONFIG="/config/act_runner/runners-cache.yaml"
 	cat <<EOF >"$RUNNERS_CACHE_CONFIG"
+runner:
+  file: REPLACE_RUNNER_STATE/.runner
 cache:
   enabled: true
   external_server: 'http://${RUNNER_CACHE_HOST}:${RUNNER_CACHE_PORT}/'
   secret: '${RUNNER_CACHE_SECRET}'
 EOF
+else
+	RUNNERS_CONFIG_BASE=""
 fi
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+# Create the config used by one runner, isolating its registration state.
+__runner_config() {
+	local runner_dir=$1
+	local runner_config="$runner_dir/config.yaml"
+	if [ -n "$RUNNERS_CONFIG_BASE" ]; then
+		sed "s|^\([[:space:]]*\)file:.*|\1file: $runner_dir/.runner|" "$RUNNERS_CONFIG_BASE" >"$runner_config" || return 1
+		echo "$runner_config"
+	elif [ -n "$RUNNERS_CACHE_CONFIG" ]; then
+		sed "s|REPLACE_RUNNER_STATE|$runner_dir|" "$RUNNERS_CACHE_CONFIG" >"$runner_config" || return 1
+		echo "$runner_config"
+	fi
+}
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 # Register a single runner synchronously (no daemon start)
 __register_runner() {
 	local runner_id=$1
 	local runner_name="${RUNNER_NAME_PREFIX:-runner}-${runner_id}"
-	local runner_dir="/config/act_runner/reg/${runner_name}"
+	local runner_dir="$RUNNERS_REGISTRATION_ROOT/${runner_name}"
 	local config_args=()
+	local runner_config=""
 
 	mkdir -p "$runner_dir"
 	[ -d "$runner_dir" ] && cd "$runner_dir" || return 1
-	[ -n "$RUNNERS_CACHE_CONFIG" ] && config_args=(--config "$RUNNERS_CACHE_CONFIG")
+	runner_config="$(__runner_config "$runner_dir")" || return 1
+	[ -n "$runner_config" ] && config_args=(--config "$runner_config")
 
 	if [ ! -f "$runner_dir/.runner" ]; then
 		__log "Registering runner: $runner_name (ID: $runner_id)"
@@ -139,11 +193,13 @@ __register_runner() {
 __start_runner_daemon() {
 	local runner_id=$1
 	local runner_name="${RUNNER_NAME_PREFIX:-runner}-${runner_id}"
-	local runner_dir="/config/act_runner/reg/${runner_name}"
+	local runner_dir="$RUNNERS_REGISTRATION_ROOT/${runner_name}"
 	local config_args=()
+	local runner_config=""
 
 	[ -d "$runner_dir" ] && cd "$runner_dir" || return 1
-	[ -n "$RUNNERS_CACHE_CONFIG" ] && config_args=(--config "$RUNNERS_CACHE_CONFIG")
+	runner_config="$(__runner_config "$runner_dir")" || return 1
+	[ -n "$runner_config" ] && config_args=(--config "$runner_config")
 	__log "Starting daemon for runner: $runner_name"
 	exec act_runner daemon "${config_args[@]}"
 }
@@ -155,20 +211,28 @@ done
 unset i
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 # Phase 2: start all daemons in parallel
+runner_pids=()
 for i in $(seq 1 $RUNNERS_START); do
 	(__start_runner_daemon "$i") &
+	runner_pids+=("$!")
 done
 unset i
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-RUNNERS_ID="$(jobs -p | tr '\n' ' ')"
-if [ -n "$RUNNERS_ID" ]; then
-	__log "All $RUNNERS_START runners started successfully"
-	__log "Process IDs: $RUNNERS_ID"
-	printf 'All %s runners started successfully: %s\n' "$RUNNERS_START" "$RUNNERS_ID"
-else
-	__log "The runners have failed to start"
-	printf '%s\n' "The runners have failed to start"
+RUNNERS_ID="${runner_pids[*]}"
+__log "All $RUNNERS_START runners launched"
+__log "Process IDs: $RUNNERS_ID"
+printf 'All %s runners launched: %s\n' "$RUNNERS_START" "$RUNNERS_ID"
+# Wait for all background processes and preserve a failure status. A daemon that
+# exits is reported as failed instead of being treated as successfully started.
+runner_failures=0
+for runner_pid in "${runner_pids[@]}"; do
+	if ! wait "$runner_pid"; then
+		runner_failures=$((runner_failures + 1))
+		__log "ERROR: Runner process $runner_pid exited unsuccessfully"
+	fi
+done
+if [ "$runner_failures" -gt 0 ]; then
+	__log "$runner_failures runner process(es) failed"
+	printf '%s\n' "$runner_failures runner process(es) failed" >&2
+	exit 1
 fi
-# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-# Wait for all background processes
-wait

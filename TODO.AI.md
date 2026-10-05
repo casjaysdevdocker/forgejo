@@ -428,6 +428,14 @@ Found while reading the full repo tree; not previously logged.
   (matching the build-stage `ENV HOSTNAME="casjaysdevdocker-forgejo"`, which was already
   correct). Fixed to `casjaysdevdocker-${IMAGE_NAME}`.
 
+## Runner maintenance and configuration migration — applied
+
+- Switched first-run config seeding in the three hand-crafted init scripts to `cp -Rn`, so existing files under `/config` are not overwritten by baked defaults.
+- `start-runners` now derives an isolated per-runner config from the rendered Forgejo base config, preserving full container/host/cache settings while giving each runner its own `.runner` registration state. The Forgejo-specific cache fallback continues to use `secret`.
+- Added `cleanup-runners` and scheduled it through the existing `__cron` helper. Cleanup is bounded by age and disk thresholds, skips unreachable Docker, never prunes running containers, and removes only stale top-level act-cache entries.
+- Gitea-specific retention/deprecation and passkey/cookie changes were not ported: the image resolves Forgejo dynamically and the reviewed Forgejo documentation does not establish equivalent version-safe behavior. `DISABLE_QUERY_AUTH_TOKEN` remains because Forgejo documents it as supported.
+- Runtime Docker/runner verification remains pending until a fresh image build and privileged integration run are available.
+
 ## Non-issue — confirmed intentional (`.gitea/workflows/docker.yaml`)
 
 - Uses a stale/unpinned action pattern (`@v2`-`@v4`, DockerHub-only, `catthehacker/ubuntu:act-latest`).

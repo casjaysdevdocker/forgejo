@@ -142,8 +142,15 @@ networks:
 | `RUNNERS_START`               | `5`                          | Number of act\_runner instances to register                                     |
 | `RUNNER_CACHE_PORT`           | `44015`                      | Port for the act\_runner cache server                                           |
 | `RUNNER_IP_ADDRESS`           | container IP                 | IP address act\_runner registers with Forgejo                                   |
-| `RUNNER_DEFAULT_HOME`         | `/config/act_runner/forgejo` | Directory where runner registration state is stored                             |
-| `RUNNER_CONFIG_NAME`          | `act_runner.yaml`            | Runner config filename inside `RUNNER_DEFAULT_HOME`                             |
+| `RUNNER_DEFAULT_HOME`         | `/config/act_runner/forgejo` | Rendered runner configuration home; registration state remains under `/config/act_runner/reg` |
+| `RUNNER_CONFIG_NAME`          | `act_runner.yaml`            | Base runner config filename inside `RUNNER_DEFAULT_HOME`; each runner gets an isolated `config.yaml` |
+| `RUNNERS_CONFIG_BASE`         | rendered config              | Override the full base config used by every runner instance                    |
+| `RUNNER_CLEANUP_ENABLED`      | `yes`                        | Periodically prune stale Docker job resources and act caches                     |
+| `RUNNER_CLEANUP_INTERVAL`     | `60`                         | Cleanup interval in minutes                                                      |
+| `RUNNER_CLEANUP_UNTIL`        | `72h`                        | Age threshold for stopped containers, networks, and build cache                  |
+| `RUNNER_CLEANUP_DISK_PERCENT` | `80`                         | Disk-use threshold for pruning all unused images                                 |
+| `RUNNER_CLEANUP_ACT_CACHE_DAYS` | `7`                       | Remove act cache entries older than this many days; `0` disables                  |
+| `RUNNER_CLEANUP_LOG_FILE`     | `/data/logs/act_runner/cleanup.log` | Cleanup log path                                                        |
 | `ACT_RUNNER_FALLBACK_VERSION` | `v13.1.0`                    | Pinned act\_runner version used if code.forgejo.org is unreachable during build |
 
 **Runner labels** are set automatically based on the host architecture. All jobs run inside Docker containers — no bare-metal execution.

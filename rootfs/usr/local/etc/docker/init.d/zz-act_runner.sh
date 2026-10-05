@@ -341,6 +341,17 @@ RUNNER_CACHE_HOST="${RUNNER_CACHE_HOST:-$IP4_ADDRESS}"
 CACHE_CONFIG_FILE="${CACHE_CONFIG_FILE:-$CONF_DIR/cache_server.yaml}"
 CACHE_LOG_FILE="${CACHE_LOG_FILE:-$LOG_DIR/cache.log}"
 RUNNER_CACHE_SECRET="${RUNNER_CACHE_SECRET:-}"
+# Rendered full runner config consumed by each per-runner daemon.
+RUNNERS_CONFIG_BASE="${RUNNERS_CONFIG_BASE:-$RUNNER_DEFAULT_HOME/$RUNNER_CONFIG_NAME}"
+# Periodic cleanup of stopped job resources and stale act caches.
+RUNNER_CLEANUP_ENABLED="${RUNNER_CLEANUP_ENABLED:-yes}"
+RUNNER_CLEANUP_INTERVAL="${RUNNER_CLEANUP_INTERVAL:-60}"
+RUNNER_CLEANUP_UNTIL="${RUNNER_CLEANUP_UNTIL:-72h}"
+RUNNER_CLEANUP_DISK_PERCENT="${RUNNER_CLEANUP_DISK_PERCENT:-80}"
+RUNNER_CLEANUP_DOCKER_DIR="${RUNNER_CLEANUP_DOCKER_DIR:-/data/docker}"
+RUNNER_CLEANUP_ACT_CACHE_DAYS="${RUNNER_CLEANUP_ACT_CACHE_DAYS:-7}"
+RUNNER_CLEANUP_ACT_CACHE_DIRS="${RUNNER_CLEANUP_ACT_CACHE_DIRS:-$HOME/.cache/act /root/.cache/act}"
+RUNNER_CLEANUP_LOG_FILE="${RUNNER_CLEANUP_LOG_FILE:-$LOG_DIR/cleanup.log}"
 # - - - - - - - - - - - - - - - - - - - - - - - - -
 # Additional variables
 
@@ -375,7 +386,7 @@ __run_precopy() {
 	if [ -d "$ETC_DIR" ] && ! [ -L "$ETC_DIR" ]; then
 		if [ ! -f "$CONF_DIR/.initialized" ]; then
 			mkdir -p "$CONF_DIR"
-			cp -Rf "$ETC_DIR/." "$CONF_DIR/" 2>/dev/null || true
+			cp -Rn "$ETC_DIR/." "$CONF_DIR/" 2>/dev/null || true
 		fi
 		rm -Rf "$ETC_DIR"
 		ln -sf "$CONF_DIR" "$ETC_DIR"
@@ -523,6 +534,10 @@ __post_execute() {
 	export SERVER_ADDRESS="$RUNNER_IP_ADDRESS:$FORGEJO_PORT" SERVER_TOKEN="${RUNNER_AUTH_TOKEN:-$SYS_AUTH_TOKEN}"
 	export RUNNER_CACHE_HOST RUNNER_CACHE_PORT
 	export RUNNER_CACHE_SECRET="${RUNNER_CACHE_SECRET:-$(__gen_cache_secret)}"
+	export RUNNERS_CONFIG_BASE
+	export RUNNER_CLEANUP_ENABLED RUNNER_CLEANUP_INTERVAL RUNNER_CLEANUP_UNTIL
+	export RUNNER_CLEANUP_DISK_PERCENT RUNNER_CLEANUP_DOCKER_DIR
+	export RUNNER_CLEANUP_ACT_CACHE_DAYS RUNNER_CLEANUP_ACT_CACHE_DIRS RUNNER_CLEANUP_LOG_FILE
 
 	# wait
 	sleep $waitTime
@@ -567,6 +582,21 @@ __post_execute() {
 			# subshell's job table; otherwise bash can block waiting on it when this
 			# subshell (itself the left side of the __post_execute pipe) reaches its end
 			disown "$!" 2>/dev/null || true
+		fi
+		if [ "${RUNNER_CLEANUP_ENABLED,,}" = "yes" ] || [ "${RUNNER_CLEANUP_ENABLED,,}" = "true" ] || [ "$RUNNER_CLEANUP_ENABLED" = "1" ]; then
+			if [ -x "/usr/local/bin/cleanup-runners" ]; then
+				cleanup_interval="${RUNNER_CLEANUP_INTERVAL:-60}"
+				if ! [[ "$cleanup_interval" =~ ^[1-9][0-9]*$ ]]; then
+					cleanup_interval=60
+				fi
+				mkdir -p "$(dirname -- "$RUNNER_CLEANUP_LOG_FILE")"
+				(
+					export RUNNER_CLEANUP_UNTIL RUNNER_CLEANUP_DISK_PERCENT RUNNER_CLEANUP_DOCKER_DIR
+					export RUNNER_CLEANUP_ACT_CACHE_DAYS RUNNER_CLEANUP_ACT_CACHE_DIRS RUNNER_CLEANUP_LOG_FILE
+					CRON_NAME="cleanup-runners" __cron "$cleanup_interval" /usr/local/bin/cleanup-runners
+				) >>"$RUNNER_CLEANUP_LOG_FILE" 2>&1 &
+				disown "$!" 2>/dev/null || true
+			fi
 		fi
 		# show exit message
 		__banner "$postMessageEnd: Status $retVal"
